@@ -20,8 +20,8 @@ int get_amount_zero(int max_num_zero){
 int main(){
     srand (time(NULL));
 
-    int NROW = 10000;
-    int NCOL = 10000;
+    int NROW = 1000;
+    int NCOL = 1000;
 
     // int a[NROW][NCOL] = {0};
     vector<vector<int>>a(NROW);
@@ -73,7 +73,7 @@ int main(){
     }
     
 
-    freopen("matrix2.txt", "w", stdout);
+    freopen("matrix3.txt", "w", stdout);
     cout << NROW << ' ' << NCOL << endl;
     for(int i=0;i<NROW;i++){
         for(int j=0;j<NCOL;j++){
