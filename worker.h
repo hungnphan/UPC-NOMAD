@@ -5,7 +5,7 @@
 // @project : NOMAD algorithm for matrix completion with UPCXX 
 // @licensed: N/A
 // @created : 03/07/2020
-// @modified: 07/07/2020
+// @modified: 09/07/2020
 // 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +28,7 @@ using namespace std;
 
 class Worker {
 
-public:	
+public: 
     // C.35: A base class destructor should be either public and virtual, or protected and nonvirtual
     // C.21: If you define or =delete any default operation, define or =delete them all
     ///////////////////////////////////////////////////////
@@ -73,32 +73,32 @@ private:
     ///////////////////////////////////////////////////////
     // Linear algebra functions
     ///////////////////////////////////////////////////////
-    double 				    vec_vec_multiply(vector<double> vec1, vector<double> vec2);
-    vector<double> 		    vec_scalar_multiply(vector<double> vec, double scalar);
-    vector<double> 		    vec_vec_add(vector<double> vec1, vector<double> vec2);
-    vector<double> 		    vec_vec_subtract(vector<double> vec1, vector<double> vec2);
+    double                  vec_vec_multiply(vector<double> vec1, vector<double> vec2);
+    vector<double>          vec_scalar_multiply(vector<double> vec, double scalar);
+    vector<double>          vec_vec_add(vector<double> vec1, vector<double> vec2);
+    vector<double>          vec_vec_subtract(vector<double> vec1, vector<double> vec2);
 
     ///////////////////////////////////////////////////////
     // Member
     ///////////////////////////////////////////////////////
-    int												proc_id			{ -1 };
-    int												num_users 		{ -1 };
-    int												num_items 		{ -1 };
-    int												num_embeddings 	{ -1 };
-    double											_alpha_ 		{ 0.0 };
-    double											_beta_ 			{ 0.0 };
-    double											_lambda_ 		{ 0.0 };
-    unsigned										random_seed 	{ 0 };
+    int                                             proc_id         { -1 };
+    int                                             num_users       { -1 };
+    int                                             num_items       { -1 };
+    int                                             num_embeddings  { -1 };
+    double                                          _alpha_         { 0.0 };
+    double                                          _beta_          { 0.0 };
+    double                                          _lambda_        { 0.0 };
+    unsigned                                        random_seed     { 0 };
 
-    std::default_random_engine 						random_engine;
-    std::uniform_int_distribution<int> 				randomer;
+    std::default_random_engine                      random_engine;
+    std::uniform_int_distribution<int>              randomer;
 
     int*                                            update_step;
-    vector<int>										user_index;
-    vector<vector<double>>							A;
-    upcxx::dist_object<upcxx::global_ptr<double>>	W;
-    upcxx::dist_object<upcxx::global_ptr<double>>	H;      // default pointed by proc-0
-    upcxx::dist_object<queue<int>>					item_queue;
+    vector<int>                                     user_index;
+    vector<vector<double>>                          A;
+    upcxx::dist_object<upcxx::global_ptr<double>>   W;
+    upcxx::dist_object<upcxx::global_ptr<double>>   H;      // default pointed by proc-0
+    upcxx::dist_object<queue<int>>                  item_queue;
 
 };
 
