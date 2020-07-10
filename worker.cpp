@@ -28,7 +28,7 @@ Worker::Worker(int proc_id, int num_users,
       _beta_        { _beta_ },
       _lambda_      { _lambda_ },
       update_step   { new int[(int) (user_index.size() * num_items)] },
-      user_index    { user_index },
+      user_index    ( user_index ),
       A             { A },
       W             ( upcxx::new_array<double>(user_index.size() * num_embeddings) ),
       H             ( upcxx::new_array<double>(num_items * num_embeddings) ),
@@ -45,7 +45,7 @@ Worker::Worker(int proc_id, int num_users,
     this->randomer = std::uniform_int_distribution<int>(0, upcxx::rank_n() - 1);
 
     // Initialize kernel W in global share memory
-    memset(this->update_step, 0, (int) (user_index.size() * num_items));
+    memset(this->update_step, 0, (int) (this->user_index->size() * num_items));
     this->initialize_W_uniform_random();
 
     // Initialize kernel H in global share memory by proc-0
@@ -68,7 +68,7 @@ void Worker::initialize_W_uniform_random() {
     double *w_ptr = this->W->local();
     std::uniform_real_distribution<double> distribution(0.0, 1.0 / sqrt(1.0 * this->num_embeddings));
 
-    for (int i = 0; i < (int) this->user_index.size(); i++) {
+    for (int i = 0; i < (int) this->user_index->size(); i++) {
         for (int j = 0; j < this->num_embeddings; j++) {
             int flatten_idx = i * (this->num_embeddings) + j;
             w_ptr[flatten_idx] = distribution(this->random_engine);
@@ -131,7 +131,7 @@ void Worker::update(int epoch_idx) {
 // @brief: Compute and update the new value of H and W
 //
 void Worker::update_value_W_and_H(int item_index) {
-    for(int i=0;i<user_index.size(); i++){
+    for(int i=0;i<user_index->size(); i++){
         if(A[i][item_index] == 0.0) continue;
 
         // Compute the learning rate w.r.t to the time step
@@ -143,7 +143,7 @@ void Worker::update_value_W_and_H(int item_index) {
         double A_ij = A[i][item_index];
 
         vector<double> W_i(this->num_embeddings);
-        upcxx::global_ptr<double> W_glptr = this->W.fetch(this->proc_id).wait();
+        upcxx::global_ptr<double> W_glptr = this->W.fetch(upcxx::rank_me()).wait();
         assert(W_glptr.is_local());
         double* W_ptr = W_glptr.local();
 
@@ -157,47 +157,55 @@ void Worker::update_value_W_and_H(int item_index) {
             H_j[k] = H_ptr[item_index*this->num_embeddings + k];
         }
 
-        W_i =   vec_vec_subtract(
-                    W_i,
-                    vec_scalar_multiply(
-                        vec_vec_add(
-                            vec_scalar_multiply(
-                                H_j, 
-                                A_ij - vec_vec_multiply(W_i, H_j)
-                            ), 
-                            vec_scalar_multiply(W_i, this->_lambda_)
-                        ), 
-                        lr
-                    )
-                );
+        vector<double> W_i_t =  vec_vec_subtract(
+                                    W_i,
+                                    vec_scalar_multiply(
+                                        vec_vec_add(
+                                            vec_scalar_multiply(
+                                                H_j, 
+                                                A_ij - vec_vec_multiply(W_i, H_j)
+                                            ), 
+                                            vec_scalar_multiply(W_i, this->_lambda_)
+                                        ), 
+                                        lr
+                                    )
+                                );
         
-        H_j =   vec_vec_subtract(
-                    H_j,
-                    vec_scalar_multiply(
-                        vec_vec_add(
-                            vec_scalar_multiply(
-                                W_i, 
-                                A_ij - vec_vec_multiply(W_i, H_j)
-                            ), 
-                            vec_scalar_multiply(H_j, this->_lambda_)
-                        ), 
-                        lr
-                    )
-                );      
+        vector<double> H_j_t =  vec_vec_subtract(
+                                    H_j,
+                                    vec_scalar_multiply(
+                                        vec_vec_add(
+                                            vec_scalar_multiply(
+                                                W_i, 
+                                                A_ij - vec_vec_multiply(W_i, H_j)
+                                            ), 
+                                            vec_scalar_multiply(H_j, this->_lambda_)
+                                        ), 
+                                        lr
+                                    )
+                                );      
         
         for(int k=0;k<this->num_embeddings;k++){
-            // Push W
-            upcxx::rput(
-                W_i[k],
-                W_glptr + i*this->num_embeddings + k
-            ).wait();
+            // Push W: W_ptr[i][k] = W_i[k]
+            // upcxx::rput(
+            //     W_i[k],
+            //     W_glptr + i*this->num_embeddings + k
+            // ).wait();
+            
+            W_ptr[i*this->num_embeddings + k] = W_i_t[k];
 
-            // Push H
-            upcxx::rput(
-                H_j[k],
-                H_glptr + item_index*this->num_embeddings + k
-            ).wait();
+
+            // Push H: H_ptr[item_index][k] = H_j[k]
+            // upcxx::rput(
+            //     H_j[k],
+            //     H_glptr + item_index*this->num_embeddings + k
+            // ).wait();
+            
+            H_ptr[item_index*this->num_embeddings + k] = H_j_t[k];
         }
+
+        // upcxx::delete_(W_glptr);
+        // upcxx::delete_(H_glptr);
     }
 
     return;
@@ -244,6 +252,39 @@ int Worker::get_priority_process_index() {
 double Worker::compute_learning_rate(int time) {
     double lr = this->_alpha_ / (1.0 + this->_beta_ * pow((double)1.0 * time, 1.5));
     return lr;
+}
+
+//
+// @brief: Compute approximate matrix A
+//
+vector<vector<double>> Worker::compute_approximate_A(){
+    assert(this->proc_id == 0);
+
+    vector<vector<double>> _A_;
+    _A_.resize(this->num_users);
+
+    double* _H_ = this->H.fetch(0).wait().local();
+
+    for(int worker_id=0;worker_id<upcxx::rank_n();worker_id++){
+        vector<int> remote_user_index = user_index.fetch(worker_id).wait();
+        double* _W_ = this->W.fetch(worker_id).wait().local();
+
+        for(int i=0;i<remote_user_index.size();i++){            
+            int usr_idx = remote_user_index[i];
+            _A_[usr_idx].resize(this->num_items);            
+
+            for(int j=0;j<this->num_items;j++){
+                _A_[usr_idx][j] = 0;
+                for(int k=0;k<this->num_embeddings;k++){
+                    // _W_[i][k]
+                    // _H_[j][k]
+                    _A_[usr_idx][j] += (_W_[i*this->num_embeddings + k] * _H_[j*this->num_embeddings + k]);                    
+                }
+            }
+        }
+    }
+    
+    return _A_;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -312,7 +353,7 @@ void Worker::print_debug_matrix(bool print_A = false, bool print_W = false, bool
     if (print_A == true) {
         printf(" ** Segment of A ** \n");
         for (int i = 0; i < this->A.size(); i++) {
-            printf("user-id = %02d\t", this->user_index.at(i));
+            printf("user-id = %02d\t", this->user_index->at(i));
             for (int j = 0; j < this->A.at(i).size(); j++)
                 printf("%.0f  ", this->A.at(i).at(j));
             printf("\n");
@@ -323,13 +364,13 @@ void Worker::print_debug_matrix(bool print_A = false, bool print_W = false, bool
         upcxx::global_ptr<double> w_obj = this->W.fetch(this->proc_id).wait();
 
         printf(" ** Segment of W ** \n");
-        for (int i = 0; i < (int)this->user_index.size(); i++) {
-            printf("user-id = %02d\t", this->user_index.at(i));
+        for (int i = 0; i < (int)this->user_index->size(); i++) {
+            printf("user-id = %02d\t", this->user_index->at(i));
             for (int j = 0; j < this->num_embeddings; j++) {
                 int flatten_idx = i * (this->num_embeddings) + j;
                 double val = upcxx::rget(w_obj + flatten_idx).wait();
 
-                printf("%.2f  ", val);
+                printf("%.4f  ", val);
             }
             printf("\n");
         }
@@ -345,7 +386,7 @@ void Worker::print_debug_matrix(bool print_A = false, bool print_W = false, bool
                 int flatten_idx = i * (this->num_embeddings) + j;
                 double val = upcxx::rget(h_obj + flatten_idx).wait();
 
-                printf("%.2f  ", val);
+                printf("%.4f  ", val);
             }
             printf("\n");
         }

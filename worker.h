@@ -54,6 +54,7 @@ public:
     void                    initialize_H_uniform_random();
     void                    add_item_idx_to_queue(int item_idx);
     void                    update(int epoch_idx);
+    vector<vector<double>>  compute_approximate_A();
 
     ///////////////////////////////////////////////////////
     // Debugging functions
@@ -94,7 +95,7 @@ private:
     std::uniform_int_distribution<int>              randomer;
 
     int*                                            update_step;
-    vector<int>                                     user_index;
+    upcxx::dist_object<vector<int>>                 user_index;
     vector<vector<double>>                          A;
     upcxx::dist_object<upcxx::global_ptr<double>>   W;
     upcxx::dist_object<upcxx::global_ptr<double>>   H;      // default pointed by proc-0

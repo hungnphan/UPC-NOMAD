@@ -12,6 +12,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>
+#include <cstdlib>
 #include <iomanip>
 #include <fstream>
 #include <random>
@@ -34,9 +35,12 @@ vector<vector<int>>     split_array_index(const vector<int> &arr, int num_segmen
 // Argument:
 //  + argv[0]   =   file_input
 //  + argv[1]   =   NUM_EPOCHS
-int main() {
+int main(int argc, char** argv) {
+    if(argc < 2) exit(0);
+    long long int NUM_EPOCHS = atoll(argv[1]);
+
     // Predefined params for sparse matrix input
-    const string file_input = "matrix3.txt";
+    const string file_input = "matrix.txt";
     int NROW, NCOL;
     vector<vector<double>> mat_data;
     vector<int> num_element_row;
@@ -56,26 +60,25 @@ int main() {
     // Premilinary definition
     upcxx::init();
     int num_proc = upcxx::rank_n();
-    int proc_id = upcxx::rank_me();
 
     // Split rows of W into 'num_worker' parts using a simple naive approach
     vector<vector<int>> split_row_index = split_array_index(num_element_row, num_proc);
 
     // Store usr_idx and corresponding rows in W, A in each process.
     vector<vector<double>> segments_A;
-    for (auto user_index : split_row_index[proc_id])
+    for (auto user_index : split_row_index[upcxx::rank_me()])
         segments_A.push_back(mat_data[user_index]);
-    assert_matrix_size(segments_A, split_row_index[proc_id].size(), NCOL);
+    assert_matrix_size(segments_A, split_row_index[upcxx::rank_me()].size(), NCOL);
 
     // Initialize worker object as upcxx::dist_object
     double alpha_rate = 0.012;
     double beta_rate = 0.01;
     double lambda_rate = 0.05;
-    upcxx::dist_object<Worker> worker(Worker(proc_id, NROW,
+    upcxx::dist_object<Worker> worker(Worker(upcxx::rank_me(), NROW,
                                              NCOL, K_embeddings,
                                              alpha_rate, beta_rate, lambda_rate,
-                                             split_row_index[proc_id], segments_A));
-
+                                             split_row_index[upcxx::rank_me()], segments_A));
+    
     // Initialize item queue of each worker randomly
     std::default_random_engine generator(time(NULL));
     std::uniform_int_distribution<int> distribution(0, num_proc - 1);
@@ -87,30 +90,44 @@ int main() {
         upcxx::barrier();
     }
 
-    // Print to test the distributing procedure
+    // // Print to test the distributing procedure
     // for (int i = 0; i < num_proc; i++) {
     //     if (upcxx::rank_me() == i) {
     //         worker->print_debug_matrix(true, true, true);
-    //         // worker->print_debug_queue();
+    //         worker->print_debug_queue();
     //     }
     //     upcxx::barrier();
     // }
 
     //////////////////////////
     // Model update
-    //////////////////////////
-    long long int NUM_EPOCHS = 700;
+    //////////////////////////    
     for (long long int epoch = 0; epoch < NUM_EPOCHS; epoch++) {
-        if(proc_id == 0) printf("-----| Epoch #%lld\n",epoch);
+        if(upcxx::rank_me() == 0) printf("-----| Epoch #%lld\n",epoch);
         worker->update(epoch + 1);
+
+        // Print to test the predicted matrix A
+        if (upcxx::rank_me() == 0) {
+        vector<vector<double>> A_pred = worker->compute_approximate_A();
+        for(int i=0;i<A_pred.size();i++){
+            vector<double> row = A_pred[i];
+            printf("row = %02d:  ", i);
+            for(auto v : row){
+                printf("%.4f ", v);
+            }
+            printf("\n");
+        }
+    }
+
+        upcxx::barrier();
     }
     upcxx::barrier();
 
-    // Print to test the distributing procedure
+    // // Print to test the distributing procedure
     // for (int i = 0; i < num_proc; i++) {
     //     if (upcxx::rank_me() == i) {
     //         printf("\nAfter update %lld epoch\n", NUM_EPOCHS);
-    //         worker->print_debug_matrix(true, true, true);
+    //         worker->print_debug_matrix(false, true, true);
     //         // worker->print_debug_queue();
     //     }
     //     upcxx::barrier();
@@ -182,7 +199,7 @@ void write_data(const string file_output, vector<vector<double>> &arr_data){
 //
 void assert_matrix_size(vector<vector<double>> &mat, int nRows, int nCols) {
     assert(mat.size() == nRows);
-    for (auto row : mat)
+    for (auto row : mat) 
         assert(row.size() == nCols);
 }
 
