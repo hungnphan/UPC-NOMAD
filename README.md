@@ -33,7 +33,7 @@ $ g++ -o gen_sparse_mat data/generate_sparse_matrix.cpp
 $ ./gen_sparse_mat 100 700
 ```
 
-## NOMAD Executation
+## NOMAD Execution
 You can optionally modify the source code and build the source with UPC++ as simple commands as follow:
 ```sh
 $ upcxx -O -o UPC-NOMAD *.cpp
