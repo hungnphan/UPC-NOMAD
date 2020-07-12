@@ -3,6 +3,7 @@
 # A implementation of NOMAD with UPC++
 
 [![](https://travis-ci.org/joemccann/dillinger.svg?branch=master)]()
+
 This repository presents an implementation of Nonlocking, stOchastic Multi-machine algorithm for Asynchronous and Decentralized matrix completion (NOMAD) in C++ with UPC++. The primary ideas are extracted from this paper
 > Yun, Hyokun, Hsiang-Fu Yu, Cho-Jui Hsieh, S. V. N. Vishwanathan and Inderjit S. Dhillon. “NOMAD: Nonlocking, stOchastic Multi-machine algorithm for Asynchronous and Decentralized matrix completion.” Proc. VLDB Endow. 7 (2014): 975-986.
 > [https://arxiv.org/abs/1312.0193](https://arxiv.org/abs/1312.0193)
@@ -10,6 +11,7 @@ This repository presents an implementation of Nonlocking, stOchastic Multi-machi
 
 ## UPC++ Installation 
 [![](https://bitbucket-assetroot.s3.amazonaws.com/c/photos/2015/May/07/1791043611-5-upcxx-logo_avatar.png)](https://bitbucket.org/berkeleylab/upcxx/wiki/Home)
+
 UPC++ is a parallel programming library for developing C++ applications with the Partitioned Global Address Space (PGAS) model. UPC++ has three main objectives:
 + Provide an object-oriented PGAS programming model in the context of the popular C++ language
 + Expose useful asynchronous parallel programming idioms unavailable in traditional SPMD models, such as remote function invocation and continuation-based operation completion, to support complex scientific applications
