@@ -19,12 +19,12 @@ UPC++ is a parallel programming library for developing C++ applications with the
 
 You can setup UPC++ as following the instruction at [here](https://bitbucket.org/berkeleylab/upcxx/wiki/INSTALL)
 
-## Spare Matrix Generation
+## Sparse Matrix Generation
 You can generate a random sparse matrix of integers with an assumption that there is at least one non-zero value in each column and each row:
 
 ```sh
 $ g++ -o gen_sparse_mat data/generate_sparse_matrix.cpp
-$ ./gen_sparse_mat no_row no_colums
+$ ./gen_sparse_mat [NROWS] [NCOLS]
 ```
 
 Example: The below command will generate a sparse matrix of integers with 100 rows and 700 columns
@@ -52,11 +52,11 @@ $ upcxx-run -n 5 UPC-NOMAD 5000 matrix.txt
 The result will be stored in a output text file named: `out_[INPUT_FILE]`
 
 ### Notice
-There are some slight difference in this implementation as compared to the original idea in the paper:
+There are some slight differences in this implementation as compared to the original idea in the paper:
 + I change the update function (9) and (10) into    
   ![equ](https://latex.codecogs.com/gif.latex?w_{it}&space;\gets&space;w_{it}-s_t&space;[(w_{it}h_{jt}-A_{itjt})&space;h_{jt}+\lambda&space;\|\|w_{it}\|\|])    
   ![equ](https://latex.codecogs.com/gif.latex?h_{jt}&space;\gets&space;h_{jt}-s_t&space;[(w_{it}h_{jt}-A_{itjt})&space;w_{it}+\lambda&space;\|\|h_{jt}\|\|])
-+ Instead of transfer a pair of ![equ](https://latex.codecogs.com/gif.latex?(j,h_j)), I store all matrix ![equ](https://latex.codecogs.com/gif.latex?H) in the global memory and I only transfer the index of corresponding rows ![equ](https://latex.codecogs.com/gif.latex?j) of H     
++ Instead of transfer a pair of ![equ](https://latex.codecogs.com/gif.latex?(j,h_j)), I store all matrix ![equ](https://latex.codecogs.com/gif.latex?H) in the global memory and I only transfer the index of corresponding rows ![equ](https://latex.codecogs.com/gif.latex?j) of ![equ](https://latex.codecogs.com/gif.latex?H)     
 + I also implemented the mechanism of dynamic load balancing which was mentioned in the paper
 
 
