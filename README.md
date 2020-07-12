@@ -54,10 +54,10 @@ The result will be stored in a output text file named: `out_[INPUT_FILE]`
 ### Notice
 There are some slight difference in this implementation as compared to the original idea in the paper:
 + We change the update function (9) and (10) into    
-  ![equ](https://latex.codecogs.com/gif.latex?w_{it}&space;\gets&space;w_{it}-s_t&space;[(w_{it}h_{jt}-A_{itjt})&space;h_{jt}+\lambda\dot&space;\|\|w_{it}\|\|])    
-  ![equ](https://latex.codecogs.com/gif.latex?h_{jt}&space;\gets&space;h_{jt}-s_t&space;[(w_{it}h_{jt}-A_{itjt})&space;w_{it}+\lambda\dot&space;\|\|h_{jt}\|\|])
-+ Instead of transfer a pair of ![equ](https://latex.codecogs.com/gif.latex?(j,h_j)), we store all matrix ![equ](https://latex.codecogs.com/gif.latex?H) in the global memory and we only transfer the index of corresponding rows ![equ](https://latex.codecogs.com/gif.latex?j) of H 
-
+  ![equ](https://latex.codecogs.com/gif.latex?w_{it}&space;\gets&space;w_{it}-s_t&space;[(w_{it}h_{jt}-A_{itjt})&space;h_{jt}+\lambda&space;\|\|w_{it}\|\|])    
+  ![equ](https://latex.codecogs.com/gif.latex?h_{jt}&space;\gets&space;h_{jt}-s_t&space;[(w_{it}h_{jt}-A_{itjt})&space;w_{it}+\lambda&space;\|\|h_{jt}\|\|])
++ Instead of transfer a pair of ![equ](https://latex.codecogs.com/gif.latex?(j,h_j)), we store all matrix ![equ](https://latex.codecogs.com/gif.latex?H) in the global memory and we only transfer the index of corresponding rows ![equ](https://latex.codecogs.com/gif.latex?j) of H     
++ We also implemented the mechanism of dynamic load balancing which was mentioned in the paper
 
 
 
