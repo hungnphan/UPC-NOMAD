@@ -44,7 +44,7 @@ To run this solution, you must specify the number of processes `NUM_PROC`, the i
 $ upcxx-run -n [NUM_PROC] UPC-NOMAD [NUM_EPOCHS] [INPUT_FILE]
 ```
 
-For example: If we want to execute this implementation with `5` processes, the input matrix is store in `matrix.txt`, and the epoch of running is `5000`, then the command should be:
+For example: If you want to execute this implementation with `5` processes, the input matrix is store in `matrix.txt`, and the epoch of running is `5000`, then the command should be:
 ```sh
 $ upcxx-run -n 5 UPC-NOMAD 5000 matrix.txt
 ```
@@ -53,11 +53,11 @@ The result will be stored in a output text file named: `out_[INPUT_FILE]`
 
 ### Notice
 There are some slight difference in this implementation as compared to the original idea in the paper:
-+ We change the update function (9) and (10) into    
++ I change the update function (9) and (10) into    
   ![equ](https://latex.codecogs.com/gif.latex?w_{it}&space;\gets&space;w_{it}-s_t&space;[(w_{it}h_{jt}-A_{itjt})&space;h_{jt}+\lambda&space;\|\|w_{it}\|\|])    
   ![equ](https://latex.codecogs.com/gif.latex?h_{jt}&space;\gets&space;h_{jt}-s_t&space;[(w_{it}h_{jt}-A_{itjt})&space;w_{it}+\lambda&space;\|\|h_{jt}\|\|])
-+ Instead of transfer a pair of ![equ](https://latex.codecogs.com/gif.latex?(j,h_j)), we store all matrix ![equ](https://latex.codecogs.com/gif.latex?H) in the global memory and we only transfer the index of corresponding rows ![equ](https://latex.codecogs.com/gif.latex?j) of H     
-+ We also implemented the mechanism of dynamic load balancing which was mentioned in the paper
++ Instead of transfer a pair of ![equ](https://latex.codecogs.com/gif.latex?(j,h_j)), I store all matrix ![equ](https://latex.codecogs.com/gif.latex?H) in the global memory and I only transfer the index of corresponding rows ![equ](https://latex.codecogs.com/gif.latex?j) of H     
++ I also implemented the mechanism of dynamic load balancing which was mentioned in the paper
 
 
 
