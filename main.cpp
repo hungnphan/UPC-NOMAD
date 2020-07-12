@@ -25,22 +25,23 @@
 #define bug(x) cout << #x << " = " << x << endl
 using namespace std;
 
-void                    read_data(const string file_input, int &NROW, int &NCOL, 
-                                  vector<vector<double>> &arr_data, vector<int> &row_count);
-void                    write_data(const string file_output, vector<vector<double>> &arr_data);
-void                    assert_matrix_size(vector<vector<double>> &mat, int nRows, int nCols);
-vector<vector<int>>     split_array_index(const vector<int> &arr, int num_segment);
-
+void read_data(const string file_input, int &NROW, int &NCOL,
+               vector<vector<double>> &arr_data, vector<int> &row_count);
+void write_data(const string file_output, vector<vector<double>> &arr_data);
+void assert_matrix_size(vector<vector<double>> &mat, int nRows, int nCols);
+vector<vector<int>> split_array_index(const vector<int> &arr, int num_segment);
 
 // Argument:
-//  + argv[0]   =   file_input
-//  + argv[1]   =   NUM_EPOCHS
-int main(int argc, char** argv) {
-    if(argc < 2) exit(0);
+//  + argv[0]   =   file_input (char*, e.g. "matrix.txt")
+//  + argv[1]   =   NUM_EPOCHS (int, e.g. 1000)
+int main(int argc, char **argv) {
+    // Collect program arguments
+    if (argc < 3)
+        exit(0);
     long long int NUM_EPOCHS = atoll(argv[1]);
+    const string file_input(argv[2]);
 
     // Predefined params for sparse matrix input
-    const string file_input = "matrix.txt";
     int NROW, NCOL;
     vector<vector<double>> mat_data;
     vector<int> num_element_row;
@@ -50,8 +51,7 @@ int main(int argc, char** argv) {
     assert_matrix_size(mat_data, NROW, NCOL);
 
     // Define matrix completion kernel: K = max(1, dim/6)
-    int K_embeddings = max(1, (int) ((0.5 * (NROW + NCOL)) / 3.0));
-
+    int K_embeddings = max(1, (int)((0.5 * (NROW + NCOL)) / 3.0));
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // MAIN PROCESS  --  Starts from here
@@ -71,26 +71,25 @@ int main(int argc, char** argv) {
     assert_matrix_size(segments_A, split_row_index[upcxx::rank_me()].size(), NCOL);
 
     // Initialize worker object as upcxx::dist_object
-    double alpha_rate = 0.012;
-    double beta_rate = 0.01;
-    double lambda_rate = 0.05;
-    upcxx::dist_object<Worker> worker(Worker(upcxx::rank_me(), NROW,
-                                             NCOL, K_embeddings,
+    double alpha_rate = 0.013;
+    double beta_rate = 0.005;
+    double lambda_rate = 0.03;
+    upcxx::dist_object<Worker> worker(Worker(upcxx::rank_me(), 
+                                             NROW, NCOL, K_embeddings,
                                              alpha_rate, beta_rate, lambda_rate,
                                              split_row_index[upcxx::rank_me()], segments_A));
-    
+
     // Initialize item queue of each worker randomly
     std::default_random_engine generator(time(NULL));
     std::uniform_int_distribution<int> distribution(0, num_proc - 1);
     for (int i = 0; i < NCOL; i++) {
         int receiver_id = distribution(generator);
-        if (upcxx::rank_me() == receiver_id){
+        if (upcxx::rank_me() == receiver_id)
             worker->add_item_idx_to_queue(i);
-        }
         upcxx::barrier();
     }
 
-    // // Print to test the distributing procedure
+    // Print to test the distributing procedure
     // for (int i = 0; i < num_proc; i++) {
     //     if (upcxx::rank_me() == i) {
     //         worker->print_debug_matrix(true, true, true);
@@ -101,38 +100,30 @@ int main(int argc, char** argv) {
 
     //////////////////////////
     // Model update
-    //////////////////////////    
+    //////////////////////////
     for (long long int epoch = 0; epoch < NUM_EPOCHS; epoch++) {
-        if(upcxx::rank_me() == 0) printf("-----| Epoch #%lld\n",epoch);
+        if (upcxx::rank_me() == 0 && (epoch % 200) == 0)
+            printf("-----| Epoch #%lld\n", epoch);
+        
         worker->update(epoch + 1);
-
-        // Print to test the predicted matrix A
-        if (upcxx::rank_me() == 0) {
-        vector<vector<double>> A_pred = worker->compute_approximate_A();
-        for(int i=0;i<A_pred.size();i++){
-            vector<double> row = A_pred[i];
-            printf("row = %02d:  ", i);
-            for(auto v : row){
-                printf("%.4f ", v);
-            }
-            printf("\n");
-        }
     }
 
-        upcxx::barrier();
-    }
     upcxx::barrier();
 
-    // // Print to test the distributing procedure
+    // Print to test the distributing procedure
     // for (int i = 0; i < num_proc; i++) {
     //     if (upcxx::rank_me() == i) {
-    //         printf("\nAfter update %lld epoch\n", NUM_EPOCHS);
-    //         worker->print_debug_matrix(false, true, true);
-    //         // worker->print_debug_queue();
+    //         worker->print_debug_matrix(true, true, true);
+    //         worker->print_debug_queue();
     //     }
     //     upcxx::barrier();
     // }
 
+    // Print to test the predicted matrix A to file
+    if (upcxx::rank_me() == 0) {
+        vector<vector<double>> A_pred = worker->compute_approximate_A();
+        write_data("out_" + file_input, A_pred);
+    }
     upcxx::finalize();
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,14 +133,13 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Subsidiary functions
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // @brief: Read the input data into pass matrix
 //
-void read_data(const string file_input, int &NROW, int &NCOL, 
+void read_data(const string file_input, int &NROW, int &NCOL,
                vector<vector<double>> &arr_data, vector<int> &row_count) {
     // Init file stream
     ifstream data_file(file_input, ios::in);
@@ -177,16 +167,15 @@ void read_data(const string file_input, int &NROW, int &NCOL,
 //
 // @brief: Write output matrix into export file
 //
-void write_data(const string file_output, vector<vector<double>> &arr_data){
+void write_data(const string file_output, vector<vector<double>> &arr_data) {
     // Init file stream
     ofstream export_file(file_output, ios::out);
 
     // Read data
     if (export_file.is_open()) {
-        for(auto row : arr_data){
-            for(auto v : row){
-                cout << fixed << setprecision(5) << v << "  ";
-            }
+        for (auto row : arr_data) {
+            for (auto v : row) 
+                export_file << fixed << setprecision(2) << v << "  ";
             export_file << endl;
         }
     }
@@ -199,7 +188,7 @@ void write_data(const string file_output, vector<vector<double>> &arr_data){
 //
 void assert_matrix_size(vector<vector<double>> &mat, int nRows, int nCols) {
     assert(mat.size() == nRows);
-    for (auto row : mat) 
+    for (auto row : mat)
         assert(row.size() == nCols);
 }
 

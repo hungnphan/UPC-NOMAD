@@ -16,6 +16,7 @@
 #pragma once
 
 #include <iostream>
+#include <iomanip>
 #include <chrono>
 #include <random>
 #include <queue>
@@ -48,7 +49,7 @@ public:
     virtual ~Worker() noexcept              = default;
 
     ///////////////////////////////////////////////////////
-    // Accessors and mutators
+    // SGD-NOMAD Model functions
     ///////////////////////////////////////////////////////
     void                    initialize_W_uniform_random();
     void                    initialize_H_uniform_random();
@@ -68,16 +69,18 @@ private:
     ///////////////////////////////////////////////////////
     double                  compute_learning_rate(int time);
     void                    update_value_W_and_H(int item_index);
-    upcxx::future<>         transfer_item(int worker_id, int item_index);
     int                     get_priority_process_index();
+    upcxx::future<>         transfer_item(int worker_id, int item_index);
 
     ///////////////////////////////////////////////////////
     // Linear algebra functions
     ///////////////////////////////////////////////////////
-    double                  vec_vec_multiply(vector<double> vec1, vector<double> vec2);
+    vector<double>          vec_scalar_add(vector<double> vec, double scalar);
     vector<double>          vec_scalar_multiply(vector<double> vec, double scalar);
+    double                  vec_vec_multiply(vector<double> vec1, vector<double> vec2);
     vector<double>          vec_vec_add(vector<double> vec1, vector<double> vec2);
     vector<double>          vec_vec_subtract(vector<double> vec1, vector<double> vec2);
+    double                  vec_norm_2(vector<double> vec);
 
     ///////////////////////////////////////////////////////
     // Member
@@ -98,7 +101,7 @@ private:
     upcxx::dist_object<vector<int>>                 user_index;
     vector<vector<double>>                          A;
     upcxx::dist_object<upcxx::global_ptr<double>>   W;
-    upcxx::dist_object<upcxx::global_ptr<double>>   H;      // default pointed by proc-0
+    upcxx::dist_object<upcxx::global_ptr<double>>   H;          // default pointed by proc-0
     upcxx::dist_object<queue<int>>                  item_queue;
 
 };

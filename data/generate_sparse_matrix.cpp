@@ -4,6 +4,7 @@
 #include <ctime>
 #include <vector>
 #include <cmath>
+#include <fstream>
 #define bug(x) cout << #x << " = " << x << endl
 using namespace std;
 
@@ -17,11 +18,15 @@ int get_amount_zero(int max_num_zero){
     return ans;
 }
 
-int main(){
-    srand (time(NULL));
+int main(int argc, char **argv){
+    // Collect program arguments
+    if (argc < 3)
+        exit(0);
+    string file_output(argv[1]);
+    int NROW = atoi(argv[2]);
+    int NCOL = atoi(argv[3]);;
 
-    int NROW = 1000;
-    int NCOL = 1000;
+    srand (time(NULL));   
 
     // int a[NROW][NCOL] = {0};
     vector<vector<int>>a(NROW);
@@ -73,14 +78,15 @@ int main(){
     }
     
 
-    freopen("matrix3.txt", "w", stdout);
-    cout << NROW << ' ' << NCOL << endl;
+    ofstream ofile(file_output, ios::out);
+    ofile << NROW << ' ' << NCOL << endl;
     for(int i=0;i<NROW;i++){
         for(int j=0;j<NCOL;j++){
-            cout << a[i][j] << "  ";
+            ofile << a[i][j] << "  ";
         }
-        cout << endl;
+        ofile << endl;
     }
+    ofile.close();
 
     return 0;
 
