@@ -1,0 +1,7 @@
+*** NOTE ***
+
+- Calculate similarity matrix
+- Slice matrix B and send to worker
+- Edit model update
+
+

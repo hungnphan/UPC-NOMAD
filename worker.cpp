@@ -30,9 +30,11 @@ Worker::Worker(int proc_id, int num_users,
       update_step       {new int[(int)(user_index.size() * num_items)]},
       user_index        (user_index),
       A                 {A},
+      Z                 (upcxx::new_array<double>(user_index.size() * num_embeddings)),
       W                 (upcxx::new_array<double>(user_index.size() * num_embeddings)),
       H                 (upcxx::new_array<double>(num_items * num_embeddings)),
-      item_queue        (queue<int>()) {
+      item_queue        (queue<int>()),
+      correl_queue      (queue<int>()) {
 
     assert(proc_id != -1);
     assert(num_users > 0);
@@ -51,6 +53,7 @@ Worker::Worker(int proc_id, int num_users,
     // Initialize kernel H in global share memory by proc-0
     if (this->proc_id == 0) {
         this->initialize_H_uniform_random();
+        this->initialize_Z_uniform_random();
         // printf(">>>\tA worker with id=%d performed init matrix H !\n", this->proc_id);
     }
 
@@ -61,6 +64,23 @@ Worker::Worker(int proc_id, int num_users,
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SGD-NOMAD Model functions
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// @brief: Initialize matrix Z using random uniform distribution on real values
+//
+void Worker::initialize_Z_uniform_random() {
+    double *z_ptr = this->Z->local();
+    std::uniform_real_distribution<double> distribution((double)0.0,
+                                                        (double)1.0 / sqrt((double)1.0 * this->num_embeddings));
+
+    for (int i = 0; i < (int)this->user_index->size(); i++) {
+        for (int j = 0; j < this->num_embeddings; j++) {
+            int flatten_idx = i * (this->num_embeddings) + j;
+            z_ptr[flatten_idx] = distribution(this->random_engine);
+        }
+    }
+    return;
+}
+
 //
 // @brief: Initialize matrix W using random uniform distribution on real values
 //
@@ -100,6 +120,14 @@ void Worker::initialize_H_uniform_random() {
 //
 void Worker::add_item_idx_to_queue(int item_idx) {
     this->item_queue->push(item_idx);
+    return;
+}
+
+//
+// @brief: Add a new item index to item queue locally
+//
+void Worker::add_user_idx_to_queue(int user_idx) {
+    this->correl_queue->push(user_idx);
     return;
 }
 

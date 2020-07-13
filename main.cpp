@@ -30,6 +30,7 @@ void read_data(const string file_input, int &NROW, int &NCOL,
 void write_data(const string file_output, vector<vector<double>> &arr_data);
 void assert_matrix_size(vector<vector<double>> &mat, int nRows, int nCols);
 vector<vector<int>> split_array_index(const vector<int> &arr, int num_segment);
+vector<vector<double>> calculate_simarity_matrix(vector<vector<double>> &arr_data);
 
 // Argument:
 //  + argv[1]   =   file_input (char*, e.g. "matrix.txt")
@@ -82,13 +83,21 @@ int main(int argc, char **argv) {
                                              alpha_rate, beta_rate, lambda_rate,
                                              split_row_index[upcxx::rank_me()], segments_A));
 
-    // Initialize item queue of each worker randomly
+    // Initialize item queue of H of each worker randomly
     std::default_random_engine generator(time(NULL));
     std::uniform_int_distribution<int> distribution(0, num_proc - 1);
     for (int i = 0; i < NCOL; i++) {
         int receiver_id = distribution(generator);
         if (upcxx::rank_me() == receiver_id)
             worker->add_item_idx_to_queue(i);
+        upcxx::barrier();
+    }
+
+    // Initialize user queue of Z of each worker randomly
+    for (int i = 0; i < NROW; i++) {
+        int receiver_id = distribution(generator);
+        if (upcxx::rank_me() == receiver_id)
+            worker->add_user_idx_to_queue(i);
         upcxx::barrier();
     }
 
@@ -228,4 +237,14 @@ vector<vector<int>> split_array_index(const vector<int> &arr, int num_segment) {
     }
 
     return ans;
+}
+
+//
+// @brief: Calculate similarity matrix among users
+//
+vector<vector<double>> calculate_simarity_matrix(vector<vector<double>> &arr_data){
+    vector<vector<double>> sim_mat;
+    sim_mat.resize(arr_data.size());
+
+
 }

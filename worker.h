@@ -51,9 +51,11 @@ public:
     ///////////////////////////////////////////////////////
     // SGD-NOMAD Model functions
     ///////////////////////////////////////////////////////
+    void                    initialize_Z_uniform_random();
     void                    initialize_W_uniform_random();
     void                    initialize_H_uniform_random();
     void                    add_item_idx_to_queue(int item_idx);
+    void                    add_user_idx_to_queue(int user_idx);
     void                    update(int epoch_idx);
     vector<vector<double>>  compute_approximate_A();
 
@@ -100,9 +102,11 @@ private:
     int*                                            update_step;
     upcxx::dist_object<vector<int>>                 user_index;
     vector<vector<double>>                          A;
+    upcxx::dist_object<upcxx::global_ptr<double>>   Z;
     upcxx::dist_object<upcxx::global_ptr<double>>   W;
     upcxx::dist_object<upcxx::global_ptr<double>>   H;          // default pointed by proc-0
     upcxx::dist_object<queue<int>>                  item_queue;
+    upcxx::dist_object<queue<int>>                  correl_queue;
 
 };
 
