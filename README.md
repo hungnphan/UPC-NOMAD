@@ -36,17 +36,17 @@ $ ./gen_sparse_mat 100 700
 ## NOMAD Execution
 You can optionally modify the source code and build the source with UPC++ as simple commands as follow:
 ```sh
-$ upcxx -O -o UPC-NOMAD *.cpp
+$ upcxx -O -o NOMAD-UPC *.cpp
 ```
 
 To run this solution, you must specify the number of processes `NUM_PROC`, the input file for sparse matrix `INPUT_FILE` and the number of epochs you need to run `NUM_EPOCHS`
 ```sh
-$ upcxx-run -n [NUM_PROC] UPC-NOMAD [INPUT_FILE] [NUM_EPOCHS]
+$ upcxx-run -n [NUM_PROC] NOMAD-UPC [INPUT_FILE] [NUM_EPOCHS]
 ```
 
 For example: If you want to execute this implementation with `5` processes, the input matrix is store in `matrix.txt`, and the epoch of running is `5000`, then the command should be:
 ```sh
-$ upcxx-run -n 5 UPC-NOMAD matrix.txt 5000 
+$ upcxx-run -n 5 NOMAD-UPC matrix.txt 5000 
 ```
 
 The result will be stored in an output text file named: `out_[INPUT_FILE]`
