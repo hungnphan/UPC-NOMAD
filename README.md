@@ -41,12 +41,12 @@ $ upcxx -O -o UPC-NOMAD *.cpp
 
 To run this solution, you must specify the number of processes `NUM_PROC`, the input file for sparse matrix `INPUT_FILE` and the number of epochs you need to run `NUM_EPOCHS`
 ```sh
-$ upcxx-run -n [NUM_PROC] UPC-NOMAD [NUM_EPOCHS] [INPUT_FILE]
+$ upcxx-run -n [NUM_PROC] UPC-NOMAD [INPUT_FILE] [NUM_EPOCHS]
 ```
 
 For example: If you want to execute this implementation with `5` processes, the input matrix is store in `matrix.txt`, and the epoch of running is `5000`, then the command should be:
 ```sh
-$ upcxx-run -n 5 UPC-NOMAD 5000 matrix.txt
+$ upcxx-run -n 5 UPC-NOMAD matrix.txt 5000 
 ```
 
 The result will be stored in a output text file named: `out_[INPUT_FILE]`
