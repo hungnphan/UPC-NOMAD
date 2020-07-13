@@ -49,7 +49,7 @@ For example: If you want to execute this implementation with `5` processes, the 
 $ upcxx-run -n 5 UPC-NOMAD matrix.txt 5000 
 ```
 
-The result will be stored in a output text file named: `out_[INPUT_FILE]`
+The result will be stored in an output text file named: `out_[INPUT_FILE]`
 
 ### Notice
 There are some slight differences in this implementation as compared to the original idea in the paper:
