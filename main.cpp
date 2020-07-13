@@ -32,14 +32,14 @@ void assert_matrix_size(vector<vector<double>> &mat, int nRows, int nCols);
 vector<vector<int>> split_array_index(const vector<int> &arr, int num_segment);
 
 // Argument:
-//  + argv[0]   =   file_input (char*, e.g. "matrix.txt")
-//  + argv[1]   =   NUM_EPOCHS (int, e.g. 1000)
+//  + argv[1]   =   file_input (char*, e.g. "matrix.txt")
+//  + argv[2]   =   NUM_EPOCHS (int, e.g. 1000)
 int main(int argc, char **argv) {
     // Collect program arguments
     if (argc < 3)
         exit(0);
-    long long int NUM_EPOCHS = atoll(argv[1]);
-    const string file_input(argv[2]);
+    const string file_input(argv[1]);
+    long long int NUM_EPOCHS = atoll(argv[2]);
 
     // Predefined params for sparse matrix input
     int NROW, NCOL;
@@ -71,9 +71,12 @@ int main(int argc, char **argv) {
     assert_matrix_size(segments_A, split_row_index[upcxx::rank_me()].size(), NCOL);
 
     // Initialize worker object as upcxx::dist_object
-    double alpha_rate = 0.013;
-    double beta_rate = 0.005;
-    double lambda_rate = 0.03;
+    // double alpha_rate = 0.013;   // for self-generated-data
+    // double beta_rate = 0.005;
+    // double lambda_rate = 0.03;
+    double alpha_rate = 0.01;      // for movielen-100k-data
+    double beta_rate = 0.015;
+    double lambda_rate = 0.0015;
     upcxx::dist_object<Worker> worker(Worker(upcxx::rank_me(), 
                                              NROW, NCOL, K_embeddings,
                                              alpha_rate, beta_rate, lambda_rate,
@@ -102,8 +105,8 @@ int main(int argc, char **argv) {
     // Model update
     //////////////////////////
     for (long long int epoch = 0; epoch < NUM_EPOCHS; epoch++) {
-        if (upcxx::rank_me() == 0 && (epoch % 200) == 0)
-            printf("-----| Epoch #%lld\n", epoch);
+        if (upcxx::rank_me() == 0 && ((epoch % 200) == 0 || epoch == (NUM_EPOCHS-1) ))
+            printf("-----| Epoch #%09lld\n", epoch);
         
         worker->update(epoch + 1);
     }
@@ -122,7 +125,13 @@ int main(int argc, char **argv) {
     // Print to test the predicted matrix A to file
     if (upcxx::rank_me() == 0) {
         vector<vector<double>> A_pred = worker->compute_approximate_A();
-        write_data("out_" + file_input, A_pred);
+
+        std::size_t found = file_input.find_last_of("/\\");
+        string _path_ = file_input.substr(0,found);
+        string _file_ = file_input.substr(found+1);
+        string file_output = _path_ + "/out_" + _file_;
+
+        write_data(file_output, A_pred);
     }
     upcxx::finalize();
 
@@ -170,7 +179,8 @@ void read_data(const string file_input, int &NROW, int &NCOL,
 void write_data(const string file_output, vector<vector<double>> &arr_data) {
     // Init file stream
     ofstream export_file(file_output, ios::out);
-
+    export_file << arr_data.size() << " " << arr_data[0].size() << endl;
+    
     // Read data
     if (export_file.is_open()) {
         for (auto row : arr_data) {
