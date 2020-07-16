@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
     }
 
     cout << "Total instance checked = " << instance_cnt << endl;
-    cout << "MSE = " << fixed << setprecision(4) << (total_dif/(1.0*instance_cnt)) << endl;
+    cout << "MSE = " << fixed << setprecision(4) << sqrt(total_dif/(1.0*instance_cnt)) << endl;
 
     return 0;
 }
