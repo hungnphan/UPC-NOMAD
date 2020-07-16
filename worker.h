@@ -37,10 +37,10 @@ public:
     ///////////////////////////////////////////////////////
     Worker()                                = default;
 
-    Worker(int proc_id, int num_users,                      // User-defined constructor
-           int num_items,int num_embeddings,
+    Worker(int proc_id, 
+           int num_users, int num_items, int num_embeddings,
            double _alpha_, double _beta_, double _lambda_,
-           vector<int>user_index, vector<vector<double>>A);
+           vector<int>user_index, vector<vector<double>>A, vector<vector<double>>B);
 
     Worker(const Worker& old)               = default;
     Worker& operator=(const Worker& old)    = default;
@@ -70,9 +70,12 @@ private:
     // Private SGD update functions
     ///////////////////////////////////////////////////////
     double                  compute_learning_rate(int time);
-    void                    update_value_W_and_H(int item_index);
-    int                     get_priority_process_index();
+    void                    update_value_W_and_H_for_A(int item_index);
+    void                    update_value_W_and_Z_for_B(int correl_user_index);
+    int                     get_priority_process_index_for_H();
+    int                     get_priority_process_index_for_Z();
     upcxx::future<>         transfer_item(int worker_id, int item_index);
+    upcxx::future<>         transfer_user(int worker_id, int correl_user_index);
 
     ///////////////////////////////////////////////////////
     // Linear algebra functions
@@ -100,8 +103,10 @@ private:
     std::uniform_int_distribution<int>              randomer;
 
     int*                                            update_step;
+    int*                                            update_step_correl;
     upcxx::dist_object<vector<int>>                 user_index;
     vector<vector<double>>                          A;
+    vector<vector<double>>                          B;
     upcxx::dist_object<upcxx::global_ptr<double>>   Z;
     upcxx::dist_object<upcxx::global_ptr<double>>   W;
     upcxx::dist_object<upcxx::global_ptr<double>>   H;          // default pointed by proc-0

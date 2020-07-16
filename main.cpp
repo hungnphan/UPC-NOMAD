@@ -30,7 +30,9 @@ void read_data(const string file_input, int &NROW, int &NCOL,
 void write_data(const string file_output, vector<vector<double>> &arr_data);
 void assert_matrix_size(vector<vector<double>> &mat, int nRows, int nCols);
 vector<vector<int>> split_array_index(const vector<int> &arr, int num_segment);
-vector<vector<double>> calculate_simarity_matrix(vector<vector<double>> &arr_data);
+vector<vector<double>> ffff(const vector<vector<double>> &arr_data);
+
+vector<vector<double>> fff_mat;
 
 // Argument:
 //  + argv[1]   =   file_input (char*, e.g. "matrix.txt")
@@ -50,6 +52,26 @@ int main(int argc, char **argv) {
     // Read input matrix as data
     read_data(file_input, NROW, NCOL, mat_data, num_element_row);
     assert_matrix_size(mat_data, NROW, NCOL);
+ 
+    // Calculate similarity matrix
+    // fff_mat = ffff(mat_data);
+    // correlation_mat.resize(NROW);
+    // for(int i=0;i<correlation_mat.size();i++){
+    //     correlation_mat[i].resize(NROW);
+    // }
+
+
+
+    // correlation_mat = calculate_simarity_matrix(mat_data);
+    // assert_matrix_size(correlation_mat, NROW, NROW);
+
+    // for(int i=0;i<mat_sim.size();i++){
+    //     for(int j=0;j<mat_sim[i].size();j++){
+    //         cout << mat_sim[i][j] << "  ";
+    //     }
+    //     cout << endl;
+    // }
+
 
     // Define matrix completion kernel: K = max(1, dim/6)
     int K_embeddings = max(1, (int)((0.5 * (NROW + NCOL)) / 3.0));
@@ -67,21 +89,25 @@ int main(int argc, char **argv) {
 
     // Store usr_idx and corresponding rows in W, A in each process.
     vector<vector<double>> segments_A;
-    for (auto user_index : split_row_index[upcxx::rank_me()])
+    vector<vector<double>> segments_B;
+    for (auto user_index : split_row_index[upcxx::rank_me()]){
         segments_A.push_back(mat_data[user_index]);
+        // segments_B.push_back(mat_sim[user_index]);
+    }
     assert_matrix_size(segments_A, split_row_index[upcxx::rank_me()].size(), NCOL);
+    // assert_matrix_size(segments_B, split_row_index[upcxx::rank_me()].size(), NROW);
 
     // Initialize worker object as upcxx::dist_object
-    // double alpha_rate = 0.013;   // for self-generated-data
-    // double beta_rate = 0.005;
-    // double lambda_rate = 0.03;
-    double alpha_rate = 0.01;      // for movielen-100k-data
-    double beta_rate = 0.015;
-    double lambda_rate = 0.0015;
+    double alpha_rate = 0.013;   // for self-generated-data
+    double beta_rate = 0.005;
+    double lambda_rate = 0.03;
+    // double alpha_rate = 0.01;      // for movielen-100k-data
+    // double beta_rate = 0.015;
+    // double lambda_rate = 0.0015;
     upcxx::dist_object<Worker> worker(Worker(upcxx::rank_me(), 
                                              NROW, NCOL, K_embeddings,
                                              alpha_rate, beta_rate, lambda_rate,
-                                             split_row_index[upcxx::rank_me()], segments_A));
+                                             split_row_index[upcxx::rank_me()], segments_A, segments_B));
 
     // Initialize item queue of H of each worker randomly
     std::default_random_engine generator(time(NULL));
@@ -94,12 +120,12 @@ int main(int argc, char **argv) {
     }
 
     // Initialize user queue of Z of each worker randomly
-    for (int i = 0; i < NROW; i++) {
-        int receiver_id = distribution(generator);
-        if (upcxx::rank_me() == receiver_id)
-            worker->add_user_idx_to_queue(i);
-        upcxx::barrier();
-    }
+    // for (int i = 0; i < NROW; i++) {
+    //     int receiver_id = distribution(generator);
+    //     if (upcxx::rank_me() == receiver_id)
+    //         worker->add_user_idx_to_queue(i);
+    //     upcxx::barrier();
+    // }
 
     // Print to test the distributing procedure
     // for (int i = 0; i < num_proc; i++) {
@@ -142,6 +168,9 @@ int main(int argc, char **argv) {
 
         write_data(file_output, A_pred);
     }
+
+    upcxx::barrier();
+
     upcxx::finalize();
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -242,9 +271,50 @@ vector<vector<int>> split_array_index(const vector<int> &arr, int num_segment) {
 //
 // @brief: Calculate similarity matrix among users
 //
-vector<vector<double>> calculate_simarity_matrix(vector<vector<double>> &arr_data){
+vector<vector<double>> ffff(const vector<vector<double>> &arr_data) {
+    // Calculate mean of each user
+    vector<double>mean_usr(arr_data.size(), 0.0);
+    for(int i=0; i<arr_data.size();i++){
+        double sum = 0.0;
+        int non_zero_cnt = 0;
+        for(int j=0;j<arr_data[i].size();j++){
+            if(arr_data[i][j] != 0.0){
+                sum += arr_data[i][j];
+                non_zero_cnt++;
+            }
+        }
+        mean_usr[i] = sum / (1.0*non_zero_cnt);
+    }
+
+    // Normalize the data: X = X - mean
+    vector<vector<double>> norm_data = arr_data;
+    for(int i=0; i<norm_data.size();i++){
+        for(int j=0;j<norm_data[i].size();j++){
+            if(norm_data[i][j] != 0.0)
+                norm_data[i][j] -= mean_usr[i];
+            
+            else 
+                norm_data[i][j] = 0.0;
+        }
+    }
+
+    // Calculate similarity matrix
     vector<vector<double>> sim_mat;
-    sim_mat.resize(arr_data.size());
+    sim_mat.resize(norm_data.size());
+    for(int i=0; i<norm_data.size();i++){
+        sim_mat[i].resize(norm_data.size());
+        for(int j=0;j<norm_data.size();j++){
+            sim_mat[i][j] = 0.0;
+            double dis_i = 0.0;
+            double dis_j = 0.0;
+            for(int k=0;k<norm_data[i].size();k++){
+                sim_mat[i][j] += (norm_data[i][k] * norm_data[j][k]);
+                dis_i += (norm_data[i][k] * norm_data[i][k]);
+                dis_j += (norm_data[j][k] * norm_data[j][k]);
+            }
+            sim_mat[i][j] = sim_mat[i][j] / (sqrt(dis_i) * sqrt(dis_j));
+        }
+    }
 
-
+    return sim_mat;
 }

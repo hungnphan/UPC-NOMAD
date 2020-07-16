@@ -16,10 +16,10 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Default operations
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-Worker::Worker(int proc_id, int num_users,
-               int num_items, int num_embeddings,
+Worker::Worker(int proc_id, 
+               int num_users, int num_items, int num_embeddings,
                double _alpha_, double _beta_, double _lambda_,
-               vector<int> user_index, vector<vector<double>> A)
+               vector<int> user_index, vector<vector<double>> A, vector<vector<double>> B)
     : proc_id           {proc_id},
       num_users         {num_users},
       num_items         {num_items},
@@ -28,9 +28,11 @@ Worker::Worker(int proc_id, int num_users,
       _beta_            {_beta_},
       _lambda_          {_lambda_},
       update_step       {new int[(int)(user_index.size() * num_items)]},
+      update_step_correl{new int[(int)(user_index.size() * num_users)]},
       user_index        (user_index),
       A                 {A},
-      Z                 (upcxx::new_array<double>(user_index.size() * num_embeddings)),
+      B                 {B},
+      Z                 (upcxx::new_array<double>(num_users * num_embeddings)),
       W                 (upcxx::new_array<double>(user_index.size() * num_embeddings)),
       H                 (upcxx::new_array<double>(num_items * num_embeddings)),
       item_queue        (queue<int>()),
@@ -46,6 +48,7 @@ Worker::Worker(int proc_id, int num_users,
     this->random_engine = std::default_random_engine(this->random_seed);
     this->randomer = std::uniform_int_distribution<int>(0, upcxx::rank_n() - 1);
     memset(this->update_step, 0, (int)(this->user_index->size() * num_items));
+    memset(this->update_step_correl, 0, (int)(this->user_index->size() * num_users));
 
     // Initialize kernel W in global share memory
     this->initialize_W_uniform_random();
@@ -72,7 +75,7 @@ void Worker::initialize_Z_uniform_random() {
     std::uniform_real_distribution<double> distribution((double)0.0,
                                                         (double)1.0 / sqrt((double)1.0 * this->num_embeddings));
 
-    for (int i = 0; i < (int)this->user_index->size(); i++) {
+    for (int i = 0; i < (int)this->num_users; i++) {
         for (int j = 0; j < this->num_embeddings; j++) {
             int flatten_idx = i * (this->num_embeddings) + j;
             z_ptr[flatten_idx] = distribution(this->random_engine);
@@ -142,24 +145,44 @@ void Worker::update(int epoch_idx) {
 
         // Compute new value of W and H
         // Remote update H using global_ptr
-        this->update_value_W_and_H(item_idx);
+        this->update_value_W_and_H_for_A(item_idx);
 
         // Transfer the item to another process
         // int receiver_id = this->randomer(this->random_engine);
-        int receiver_id = this->get_priority_process_index();
+        int receiver_id = this->get_priority_process_index_for_H();
         this->transfer_item(receiver_id, item_idx).wait();
 
         // Print to debug the transfer process
         // if (upcxx::rank_me() == this->proc_id)
         // printf("Proc-id=%02d: item=%02d\t|||\treceiver=%02d\n", this->proc_id, item_idx, receiver_id);
     }
+
+    // if (this->correl_queue->empty() == false) {
+    //     // Get the first item index from the queue
+    //     int correl_usr_idx = this->correl_queue->front();
+    //     this->correl_queue->pop();
+
+    //     // Compute new value of W and Z
+    //     // Remote update Z using global_ptr
+    //     this->update_value_W_and_Z_for_B(correl_usr_idx);
+
+    //     // Transfer the item to another process
+    //     // int receiver_id = this->randomer(this->random_engine);
+    //     int receiver_id = this->get_priority_process_index_for_Z();
+    //     this->transfer_user(receiver_id, correl_usr_idx).wait();
+
+    //     // Print to debug the transfer process
+    //     // if (upcxx::rank_me() == this->proc_id)
+    //     // printf("Proc-id=%02d: item=%02d\t|||\treceiver=%02d\n", this->proc_id, item_idx, receiver_id);
+    // }
+
     return;
 }
 
 //
 // @brief: Compute and update the new value of H and W
 //
-void Worker::update_value_W_and_H(int item_index) {
+void Worker::update_value_W_and_H_for_A(int item_index) {
     for (int i = 0; i < user_index->size(); i++) {
         if (A[i][item_index] == 0.0)
             continue;
@@ -234,6 +257,82 @@ void Worker::update_value_W_and_H(int item_index) {
     return;
 }
 
+
+//
+// @brief: Compute and update the new value of Z and W
+//
+void Worker::update_value_W_and_Z_for_B(int correl_user_index) {
+    for (int i = 0; i < user_index->size(); i++) {
+        // Compute the learning rate w.r.t to the time step
+        int t = ++(this->update_step_correl[i * this->num_users + correl_user_index]);
+        double lr = compute_learning_rate(t);
+
+        // Prepare B[i][u], W[i] and Z[u]
+        double B_iu = B[i][correl_user_index];
+
+        vector<double> W_i(this->num_embeddings);
+        upcxx::global_ptr<double> W_glptr = this->W.fetch(upcxx::rank_me()).wait();
+        assert(W_glptr.is_local());
+        double *W_ptr = W_glptr.local();
+
+        vector<double> Z_u(this->num_embeddings);
+        upcxx::global_ptr<double> Z_glptr = this->Z.fetch(0).wait();
+        assert(Z_glptr.is_local());
+        double *Z_ptr = Z_glptr.local();
+
+        for (int k = 0; k < this->num_embeddings; k++) {
+            W_i[k] = W_ptr[i * this->num_embeddings + k];
+            Z_u[k] = Z_ptr[correl_user_index * this->num_embeddings + k];
+        }
+
+        // SGD update on W_i, Z_u
+        vector<double> W_i_t = 
+            vec_vec_subtract(
+                W_i,
+                vec_scalar_multiply(
+                    // vec_vec_add(
+                    vec_scalar_add(
+                        vec_scalar_multiply(
+                            Z_u,
+                            vec_vec_multiply(W_i, Z_u) - B_iu
+                        ),
+                        // vec_scalar_multiply(W_i, this->_lambda_)
+                        vec_norm_2(W_i) * this->_lambda_
+                    ),
+                    lr
+                )
+            );
+
+        vector<double> Z_u_t = 
+            vec_vec_subtract(
+                Z_u,
+                vec_scalar_multiply(
+                    // vec_vec_add(
+                    vec_scalar_add(
+                        vec_scalar_multiply(
+                            W_i,
+                            vec_vec_multiply(W_i, Z_u) - B_iu
+                        ),
+                        // vec_scalar_multiply(H_j, this->_lambda_)),
+                        vec_norm_2(Z_u) * this->_lambda_
+                    ),
+                    lr
+                )
+            );
+
+        // Update the optimized params
+        for (int k = 0; k < this->num_embeddings; k++) {
+            // Push W: W_ptr[i][k] = W_i[k]
+            W_ptr[i * this->num_embeddings + k] = W_i_t[k];
+
+            // Push Z: Z_ptr[correl_user_index][k] = Z_u[k]
+            Z_ptr[correl_user_index * this->num_embeddings + k] = Z_u_t[k];
+        }
+    }
+
+    return;
+}
+
 //
 // @brief: Push the item index to another process
 //
@@ -247,10 +346,22 @@ upcxx::future<> Worker::transfer_item(int worker_id, int item_index) {
 }
 
 //
+// @brief: Push the item index to another process
+//
+upcxx::future<> Worker::transfer_user(int worker_id, int correl_user_index) {
+    return upcxx::rpc(
+        worker_id,
+        [](upcxx::dist_object<queue<int>> &correl_queue, int correl_user_index) {
+            correl_queue->push(correl_user_index);
+        },
+        correl_queue, correl_user_index);
+}
+
+//
 // @brief: Dynamic Load Balancing: Get the index of
 // process/worker that have the least amount of items
 //
-int Worker::get_priority_process_index() {
+int Worker::get_priority_process_index_for_H() {
     int min_capac = this->num_items;
     int min_proc_id = -1;
     for (int id = 0; id < upcxx::rank_n(); id++)     {
@@ -260,6 +371,28 @@ int Worker::get_priority_process_index() {
                                 return (int)item_queue->size();
                             },
                             item_queue).wait();
+        if (remote_capac <= min_capac) {
+            min_capac = remote_capac;
+            min_proc_id = id;
+        }
+    }
+    return min_proc_id;
+}
+
+//
+// @brief: Dynamic Load Balancing: Get the index of
+// process/worker that have the least amount of items
+//
+int Worker::get_priority_process_index_for_Z() {
+    int min_capac = this->num_users;
+    int min_proc_id = -1;
+    for (int id = 0; id < upcxx::rank_n(); id++)     {
+        int remote_capac = upcxx::rpc(
+                            id,
+                            [](upcxx::dist_object<queue<int>> &correl_queue) {
+                                return (int)correl_queue->size();
+                            },
+                            correl_queue).wait();
         if (remote_capac <= min_capac) {
             min_capac = remote_capac;
             min_proc_id = id;
