@@ -36,7 +36,7 @@ $ ./gen_sparse_mat 100 700
 ## NOMAD Execution
 You can optionally modify the source code and build the source with UPC++ as simple commands as follow:
 ```sh
-$ upcxx -O -o NOMAD-UPC *.cpp
+$ upcxx -O -o NOMAD-UPC main.cpp worker.cpp
 ```
 
 To run this solution, you must specify the number of processes `NUM_PROC`, the input file for sparse matrix `INPUT_FILE` and the number of epochs you need to run `NUM_EPOCHS`
@@ -50,6 +50,27 @@ $ upcxx-run -n 5 NOMAD-UPC matrix.txt 5000
 ```
 
 The result will be stored in an output text file named: `out_[INPUT_FILE]`
+
+## NOMAD with Movielen-100K
+[MovieLens](https://grouplens.org/datasets/movielens/) 100K movie ratings. Stable benchmark dataset. 100,000 ratings from 1000 users on 1700 movies. I added an evaluation for Movielen-100K dataset. Training NOMAD with MovieLens on training set `X` (for `X in [1, 2, 3, 4, 5, 'a', 'b']`) is performed with following command:
+
+```sh
+$ upcxx-run -n 5 NOMAD-UPC movielen-100k-data/sparse_u[X].base [NUM_EPOCHS] 
+```
+
+To evaluate the RMSE of training set of set `X`, we execute a command:
+
+```sh
+$ ./evaluation movielen-100k-data/out_sparse_u[X].base movielen-100k-data/sparse_u[X].base  
+```
+
+To evaluate the RMSE of testing set of set `X`, we execute a command:
+
+```sh
+$ ./evaluation movielen-100k-data/out_sparse_u[X].base movielen-100k-data/sparse_u[X].test  
+```
+
+
 
 ### Notice
 There are some slight differences in this implementation as compared to the original idea in the paper:
