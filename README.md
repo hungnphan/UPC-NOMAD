@@ -51,7 +51,7 @@ $ upcxx-run -n 5 NOMAD-UPC matrix.txt 5000
 
 The result will be stored in an output text file named: `out_[INPUT_FILE]`
 
-## NOMAD with Movielen-100K
+## NOMAD with MovieLens-100K
 [MovieLens](https://grouplens.org/datasets/movielens/) 100K movie ratings. Stable benchmark dataset. 100,000 ratings from 1000 users on 1700 movies. I added an evaluation for Movielen-100K dataset. Training NOMAD with MovieLens on training set `X` (for `X in [1, 2, 3, 4, 5, 'a', 'b']`) is performed with following command:
 
 ```sh
