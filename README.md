@@ -1,6 +1,6 @@
 
 
-# A implementation of NOMAD with UPC++
+# An implementation of NOMAD with UPC++
 
 [![](https://travis-ci.org/joemccann/dillinger.svg?branch=master)]()
 
