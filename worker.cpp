@@ -194,13 +194,29 @@ void Worker::update_value_W_and_H(int item_index) {
             );
 
         // Update the optimized params
-        for (int k = 0; k < this->num_embeddings; k++) {
-            // Push W: W_ptr[i][k] = W_i[k]
-            W_ptr[i * this->num_embeddings + k] = W_i_t[k];
+        // for (int k = 0; k < this->num_embeddings; k++) {
+        //     // Push W: W_ptr[i][k] = W_i[k]
+        //     W_ptr[i * this->num_embeddings + k] = W_i_t[k];
 
-            // Push H: H_ptr[item_index][k] = H_j[k]
-            H_ptr[item_index * this->num_embeddings + k] = H_j_t[k];
-        }
+        //     // Push H: H_ptr[item_index][k] = H_j[k]
+        //     H_ptr[item_index * this->num_embeddings + k] = H_j_t[k];
+        // }
+
+        // Update the optimized params
+        // use upcxx::rput(src,dst,size)
+        double* W_i_t_arr = &W_i_t[0];
+        double* H_j_t_arr = &H_j_t[0];
+        upcxx::rput(
+            W_i_t_arr,
+            W_glptr + (i * this->num_embeddings),
+            this->num_embeddings
+        ).wait();
+        upcxx::rput(
+            H_j_t_arr,
+            H_glptr + (item_index * this->num_embeddings),
+            this->num_embeddings
+        ).wait();
+
     }
 
     return;
